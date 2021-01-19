@@ -82,5 +82,34 @@ namespace ReadEmail
                   .PostAsync();
         }
 
+
+        public static async System.Threading.Tasks.Task ReadMailAsync()
+        {
+            string[] scopes = new string[] { "https://graph.microsoft.com/.default" };
+            IConfidentialClientApplication confidentialClient = ConfidentialClientApplicationBuilder
+                .Create(clientId)
+                .WithClientSecret(clientSecret)
+                .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}/v2.0"))
+                .Build();
+
+            // Retrieve an access token for Microsoft Graph (gets a fresh token if needed).
+            var authResult = await confidentialClient
+                    .AcquireTokenForClient(scopes)
+                    .ExecuteAsync().ConfigureAwait(false);
+
+            var token = authResult.AccessToken;
+            // Build the Microsoft Graph client. As the authentication provider, set an async lambda
+            // which uses the MSAL client to obtain an app-only access token to Microsoft Graph,
+            // and inserts this access token in the Authorization header of each API request. 
+            GraphServiceClient graphServiceClient =
+                new GraphServiceClient(new DelegateAuthenticationProvider(async (requestMessage) =>
+                {
+                    // Add the access token in the Authorization header of the API request.
+                    requestMessage.Headers.Authorization =
+                            new AuthenticationHeaderValue("Bearer", token);
+                })
+                );
+            await graphServiceClient.Users[userId].MailFolders.Inbox.Messages.Request().GetAsync();
+        }
     }
 }
